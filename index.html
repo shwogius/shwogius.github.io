@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Daily Focus 1-3-5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        :root { --bg: #f8fafc; --accent: #6366f1; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg); color: #1e293b; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        
+        .task-card { transition: transform 0.2s, box-shadow 0.2s; position: relative; overflow: hidden; min-height: 100px; cursor: grab; }
+        .task-card:active { cursor: grabbing; }
+        .card-bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+        .card-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%); z-index: 1; }
+        .card-content { position: relative; z-index: 2; }
+        .strikethrough { text-decoration: line-through !important; opacity: 0.5; }
+        
+        /* Extreme Font Size for Big Thing */
+        .extreme-text {
+            font-size: 2.25rem;
+            line-height: 1.1;
+            letter-spacing: -0.05em;
+            font-weight: 800;
+        }
+
+        /* Drag & Drop Styling */
+        .sortable-ghost { opacity: 0.3; transform: scale(0.95); }
+        .sortable-chosen { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .drop-zone { min-height: 50px; }
+
+        input[type="checkbox"] { appearance: none; width: 28px; height: 28px; border: 2px solid rgba(200, 200, 200, 0.4); border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.1); flex-shrink: 0; position: relative; }
+        input[type="checkbox"]:checked { background-color: var(--accent); border-color: var(--accent); }
+        input[type="checkbox"]:checked::after { content: "✓"; color: white; position: absolute; left: 6px; top: 1px; font-size: 18px; font-weight: bold; }
+        .tag-pill { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+    </style>
+</head>
+<body class="min-h-screen pb-24 px-6 pt-12">
+    <div class="max-w-md mx-auto">
+        <header class="mb-10">
+            <div class="flex justify-between items-end mb-2">
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Focus</h1>
+                    <p id="date-display" class="text-slate-400 font-semibold text-sm uppercase tracking-wider"></p>
+                </div>
+                <div id="percentage-label" class="text-indigo-600 font-bold text-lg">0%</div>
+            </div>
+            <div class="bg-slate-200 h-3 rounded-full overflow-hidden">
+                <div id="progress-bar" class="bg-indigo-600 h-full transition-all duration-700 w-0"></div>
+            </div>
+        </header>
+
+        <div id="filter-banner" class="hidden mb-6 bg-indigo-600 text-white rounded-xl p-3 justify-between items-center shadow-lg">
+            <span class="text-xs font-bold uppercase tracking-wider">Tag: <span id="active-tag-name"></span></span>
+            <button onclick="clearFilter()" class="bg-white/20 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Show All</button>
+        </div>
+
+        <div id="main-list" class="space-y-12">
+            <section id="s-big">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">Priority 1</span>
+                    <h2 class="text-xs font-bold uppercase text-slate-400 tracking-widest text-glow">The Big Thing</h2>
+                </div>
+                <div id="big-container" class="drop-zone" data-group="big"></div>
+            </section>
+            
+            <section id="s-med">
+                <h2 class="text-xs font-bold uppercase text-slate-400 mb-4 tracking-widest">Medium Things</h2>
+                <div id="medium-container" class="space-y-3 drop-zone" data-group="medium"></div>
+            </section>
+            
+            <section id="s-small">
+                <h2 class="text-xs font-bold uppercase text-slate-400 mb-4 tracking-widest">Small Wins</h2>
+                <div id="small-container" class="space-y-3 drop-zone" data-group="small"></div>
+            </section>
+        </div>
+
+        <div id="no-results" class="hidden py-20 text-center text-slate-400 italic">No tasks with this tag.</div>
+    </div>
+
+    <input type="file" id="image-upload" accept="image/*" class="hidden">
+
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xs px-4 flex justify-around bg-slate-900/90 backdrop-blur rounded-full py-3 border border-white/10 shadow-2xl z-50">
+        <button onclick="resetDay()" class="text-slate-400 hover:text-red-400 text-[10px] font-bold uppercase">Clear Day</button>
+        <button onclick="exportData()" class="text-slate-400 hover:text-indigo-400 text-[10px] font-bold uppercase">Backup</button>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'daily_focus_final_v2';
+
+        let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+            big: [{t: '', d: false, img: null, tags: [], id: Math.random()}],
+            medium: Array(3).fill().map(() => ({t: '', d: false, img: null, tags: [], id: Math.random()})),
+            small: Array(5).fill().map(() => ({t: '', d: false, img: null, tags: [], id: Math.random()}))
+        };
+        
+        let activeUpload = null, currentFilter = null;
+
+        function init() {
+            document.getElementById('date-display').innerText = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            document.getElementById('image-upload').addEventListener('change', handleUpload);
+            render();
+            initSortable();
+        }
+
+        function initSortable() {
+            const options = {
+                group: 'shared',
+                animation: 250,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                delay: 150, // Added delay for mobile touch-and-hold feel
+                delayOnTouchOnly: true,
+                onEnd: function (evt) {
+                    const fromGroup = evt.from.dataset.group;
+                    const toGroup = evt.to.dataset.group;
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+
+                    // Move task in state
+                    const movedItem = state[fromGroup].splice(oldIndex, 1)[0];
+                    state[toGroup].splice(newIndex, 0, movedItem);
+
+                    persist();
+                    render(); // Full render to apply the "Extreme" font if it moved to Big
+                }
+            };
+
+            Sortable.create(document.getElementById('big-container'), options);
+            Sortable.create(document.getElementById('medium-container'), options);
+            Sortable.create(document.getElementById('small-container'), options);
+        }
+
+        function render() {
+            const counts = { big: renderGroup('big'), medium: renderGroup('medium'), small: renderGroup('small') };
+            const banner = document.getElementById('filter-banner');
+            banner.style.display = currentFilter ? 'flex' : 'none';
+            if(currentFilter) document.getElementById('active-tag-name').innerText = currentFilter;
+            
+            document.getElementById('s-big').style.display = (counts.big > 0 || !currentFilter) ? 'block' : 'none';
+            document.getElementById('s-med').style.display = (counts.medium > 0 || !currentFilter) ? 'block' : 'none';
+            document.getElementById('s-small').style.display = (counts.small > 0 || !currentFilter) ? 'block' : 'none';
+            document.getElementById('no-results').style.display = (currentFilter && (counts.big + counts.medium + counts.small) === 0) ? 'block' : 'none';
+            updateProgress();
+        }
+
+        function renderGroup(key) {
+            const container = document.getElementById(key + '-container');
+            container.innerHTML = '';
+            let count = 0;
+            const isBig = key === 'big';
+
+            state[key].forEach((task, i) => {
+                if(currentFilter && !task.tags.includes(currentFilter)) return;
+                count++;
+                const card = document.createElement('div');
+                card.className = `task-card rounded-3xl border shadow-sm flex flex-col mb-3 ${task.img ? 'border-transparent' : 'bg-white border-slate-100'}`;
+                card.innerHTML = `
+                    ${task.img ? `<img src="${task.img}" class="card-bg-img"><div class="card-overlay"></div>` : ''}
+                    <div class="card-content p-6 flex flex-col gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="pt-1">
+                                <input type="checkbox" ${task.d ? 'checked' : ''} onchange="updateTaskStatus('${key}', ${i}, this.checked)">
+                            </div>
+                            <textarea id="input-${key}-${i}" 
+                                oninput="updateTaskText('${key}', ${i}, this.value); autoResize(this)" 
+                                placeholder="${isBig ? 'THE ONE GOAL' : 'Next task...'}" 
+                                rows="1"
+                                class="flex-1 bg-transparent border-none focus:outline-none resize-none 
+                                ${isBig ? 'extreme-text' : 'text-base font-bold'} 
+                                ${task.img ? 'text-white placeholder:text-white/20' : 'text-slate-800'} 
+                                ${task.d ? 'strikethrough' : ''}">${task.t}</textarea>
+                            
+                            <button onclick="${task.img ? `updateTaskImage('${key}',${i},null)` : `triggerUpload('${key}',${i})`}" 
+                                class="mt-1 transition-opacity ${task.img ? 'text-white/50 hover:text-white' : 'text-slate-300 hover:text-indigo-500'}">
+                                ${task.img ? '✕' : '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>'}
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2 items-center">
+                            ${task.tags.map((t, ti) => `
+                                <span onclick="currentFilter='${t}';render()" class="tag-pill ${task.img ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}">
+                                    ${t}
+                                    <b onclick="event.stopPropagation();removeTag('${key}',${i},${ti})" class="ml-1 opacity-50 hover:opacity-100">✕</b>
+                                </span>`).join('')}
+                            <input type="text" placeholder="+ tag" onkeydown="addTag(event, '${key}', ${i})" 
+                                class="bg-transparent text-[10px] font-black uppercase tracking-widest w-16 focus:w-24 transition-all focus:outline-none 
+                                ${task.img ? 'text-white/40 placeholder:text-white/20' : 'text-slate-400 placeholder:text-slate-300'}">
+                        </div>
+                    </div>`;
+                container.appendChild(card);
+                autoResize(document.getElementById(`input-${key}-${i}`));
+            });
+            return count;
+        }
+
+        function autoResize(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        function updateTaskText(k, i, v) {
+            state[k][i].t = v;
+            persist();
+            updateProgress();
+        }
+
+        function updateTaskStatus(k, i, v) {
+            state[k][i].d = v;
+            const input = document.getElementById(`input-${k}-${i}`);
+            if (v) input.classList.add('strikethrough');
+            else input.classList.remove('strikethrough');
+            persist();
+            updateProgress();
+        }
+
+        function updateTaskImage(k, i, v) {
+            state[k][i].img = v;
+            persist();
+            render();
+        }
+
+        function addTag(e, k, i) {
+            if(e.key === 'Enter' && e.target.value) {
+                state[k][i].tags.push(e.target.value.trim().toLowerCase());
+                e.target.value = '';
+                persist();
+                render();
+            }
+        }
+
+        function removeTag(k, i, ti) {
+            state[k][i].tags.splice(ti, 1);
+            persist();
+            render();
+        }
+
+        function persist() { 
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } 
+            catch (e) { console.error("Storage full"); }
+        }
+
+        function triggerUpload(k, i) { activeUpload = {k, i}; document.getElementById('image-upload').click(); }
+        function clearFilter() { currentFilter = null; render(); }
+        function resetDay() { if(confirm("Start fresh? This clears everything.")) { localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+        function exportData() { let data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state)); let a = document.createElement('a'); a.href = data; a.download = "focus_backup.json"; a.click(); }
+
+        function handleUpload(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (re) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height, m = 1000;
+                    if (w > h) { if (w > m) { h *= m/w; w = m; } } else { if (h > m) { w *= m/h; h = m; } }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    updateTaskImage(activeUpload.k, activeUpload.i, canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.src = re.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateProgress() {
+            const all = [...state.big, ...state.medium, ...state.small].filter(t => t.t.trim());
+            const done = all.filter(t => t.d).length;
+            const p = all.length ? Math.round((done / all.length) * 100) : 0;
+            const label = document.getElementById('percentage-label');
+            const bar = document.getElementById('progress-bar');
+            if (label) label.innerText = p + '%';
+            if (bar) bar.style.width = p + '%';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
