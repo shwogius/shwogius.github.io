@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Daily Focus Sync</title>
     
-    <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus Sync">
@@ -31,26 +30,25 @@
         .card-emerald { background-color: #ecfdf5; border-color: #d1fae5; }
         .card-slate { background-color: #f1f5f9; border-color: #e2e8f0; }
 
-        .task-card { transition: all 0.3s ease; position: relative; overflow: hidden; min-height: 80px; }
+        .task-card { transition: all 0.3s ease; position: relative; overflow: hidden; }
         .strikethrough { text-decoration: line-through !important; opacity: 0.5; }
-        .extreme-text { font-size: 2rem; line-height: 1.1; letter-spacing: -0.05em; font-weight: 800; }
+        .extreme-text { font-size: 2.25rem; line-height: 1.1; letter-spacing: -0.05em; font-weight: 800; }
         
-        /* Checkboxes */
         input[type="checkbox"] { appearance: none; width: 24px; height: 24px; border: 2px solid rgba(200, 200, 200, 0.4); border-radius: 6px; cursor: pointer; background: white; flex-shrink: 0; position: relative; }
         input[type="checkbox"]:checked { background-color: var(--accent); border-color: var(--accent); }
         input[type="checkbox"]:checked::after { content: "✓"; color: white; position: absolute; left: 5px; top: 0px; font-size: 14px; font-weight: bold; }
         
+        .subtask-check { width: 18px !important; height: 18px !important; border-radius: 4px !important; }
+        .subtask-check:checked::after { left: 4px !important; top: -1px !important; font-size: 11px !important; }
         .subtask-item { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-left: 36px; }
+
         .tag-pill { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.05); color: #64748b; }
-        .color-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); }
         
         #sync-status { font-size: 10px; font-weight: 800; text-transform: uppercase; }
         .syncing { color: #6366f1; animation: pulse 1s infinite; }
         .synced { color: #10b981; }
-
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        
-        .hidden { display: none !important; }
     </style>
 </head>
 <body class="min-h-screen pb-40 px-6 pt-12">
@@ -58,99 +56,72 @@
         <header class="mb-10">
             <div class="flex justify-between items-start mb-2">
                 <div>
-                    <div class="flex items-center gap-3">
-                        <h1 id="view-title" class="text-3xl font-extrabold tracking-tight text-slate-900">Focus</h1>
-                        <button onclick="toggleArchiveView()" id="archive-toggle-btn" class="bg-slate-200 hover:bg-slate-300 text-[10px] font-black uppercase px-3 py-1 rounded-full transition-colors">
-                            View Archive
-                        </button>
-                    </div>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Focus</h1>
                     <div class="flex items-center gap-2 mt-1">
                         <span id="date-display" class="text-slate-400 font-semibold text-xs uppercase tracking-wider"></span>
-                        <span id="sync-status" class="synced">• Initializing</span>
+                        <span id="sync-status" class="synced">Connecting...</span>
                     </div>
                 </div>
                 <div id="percentage-label" class="text-indigo-600 font-black text-xl">0%</div>
             </div>
-            <div id="progress-container" class="bg-slate-200 h-2 rounded-full overflow-hidden mt-4">
+            <div class="bg-slate-200 h-2 rounded-full overflow-hidden mt-4">
                 <div id="progress-bar" class="bg-indigo-600 h-full transition-all duration-1000 w-0"></div>
             </div>
         </header>
 
-        <!-- Active View -->
-        <div id="active-view" class="space-y-12">
-            <section>
+        <div id="main-list" class="space-y-12">
+            <section id="sect-big">
                 <div class="flex items-center gap-2 mb-4">
-                    <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">Primary Focus</span>
+                    <span class="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">Priority 1</span>
                 </div>
                 <div id="big-container"></div>
             </section>
             
-            <section>
+            <section id="sect-medium">
                 <h2 class="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-[0.2em]">Medium Focus</h2>
                 <div id="medium-container" class="space-y-3"></div>
             </section>
             
-            <section>
+            <section id="sect-small">
                 <h2 class="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-[0.2em]">Quick Wins</h2>
                 <div id="small-container" class="space-y-3"></div>
             </section>
         </div>
-
-        <!-- Archive View -->
-        <div id="archive-view" class="hidden space-y-6">
-            <div id="archive-empty-state" class="text-center py-20 text-slate-400">
-                <p class="text-xs font-bold uppercase tracking-widest">No archived tasks found.</p>
-            </div>
-            <div id="archive-list" class="space-y-8"></div>
-        </div>
     </div>
 
-    <!-- Bottom Nav -->
     <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-sm flex flex-col gap-2 z-50">
         <div class="bg-slate-900/95 backdrop-blur-xl rounded-3xl p-4 flex justify-around items-center border border-white/10 shadow-2xl">
-            <button id="nav-action-btn" onclick="archiveCompleted()" class="text-white text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100">Archive</button>
+            <button id="btn-reset" class="text-white text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100">Reset</button>
             <div class="h-4 w-px bg-white/10"></div>
-            <button onclick="showSyncModal()" class="text-white text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100">Devices</button>
+            <button id="btn-sync" class="text-white text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100">Sync Info</button>
             <div class="h-4 w-px bg-white/10"></div>
             <button onclick="window.print()" class="text-white text-[10px] font-black uppercase tracking-widest opacity-60 hover:opacity-100">Print</button>
         </div>
-        <div id="user-badge" class="text-center text-[9px] text-slate-400 font-mono tracking-tighter opacity-50">Offline Mode</div>
+        <div id="user-badge" class="text-center text-[9px] text-slate-400 font-mono tracking-tighter opacity-50">Checking Auth...</div>
     </div>
 
-    <!-- Sync/Device Modal -->
     <div id="sync-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-6">
         <div class="bg-white rounded-3xl p-8 w-full max-w-xs shadow-2xl">
-            <h3 class="text-xl font-black mb-2">Device Sync</h3>
-            <p class="text-slate-500 text-[10px] mb-4 uppercase font-bold tracking-tight">Your Device ID:</p>
-            <div class="bg-slate-100 p-3 rounded-xl mb-6 flex justify-between items-center group">
+            <h3 class="text-xl font-black mb-2">Sync Devices</h3>
+            <p class="text-slate-500 text-xs mb-6">Use this ID to sync across desktop and mobile.</p>
+            <div class="bg-slate-100 p-3 rounded-xl mb-6 flex justify-between items-center">
                 <code id="display-uid" class="text-[10px] font-mono text-slate-600 truncate mr-2">...</code>
-                <button onclick="copyId()" class="text-indigo-600 font-black text-[10px] uppercase">Copy</button>
+                <button id="btn-copy" class="text-indigo-600 font-black text-[10px] uppercase">Copy</button>
             </div>
-            
-            <div class="border-t pt-6">
-                <p class="text-slate-500 text-[10px] mb-2 uppercase font-bold tracking-tight">Switch to another ID:</p>
-                <div class="flex gap-2">
-                    <input type="text" id="manual-uid-input" placeholder="Paste ID here" class="flex-1 bg-slate-50 border rounded-xl px-3 py-2 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                    <button onclick="loadManualId()" class="bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-2 rounded-xl">Load</button>
-                </div>
-            </div>
-            
-            <button onclick="hideSyncModal()" class="w-full bg-slate-900 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest mt-8">Close</button>
+            <button id="btn-close-modal" class="w-full bg-slate-900 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest">Done</button>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, addDoc, collection, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Fallback for environment variables
-        const firebaseConfig = JSON.parse(__firebase_config || '{}');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'daily-focus-sync';
-        
+        const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'focus-pwa-v1';
 
         const COLORS = [
             { id: 'white', hex: '#ffffff' },
@@ -161,15 +132,11 @@
             { id: 'slate', hex: '#f1f5f9' }
         ];
 
-        let currentUser = null;
-        let activeUid = null;
         let state = null;
-        let archivedBatches = [];
-        let debounceTimer;
-        let isViewingArchive = false;
-        let unsubData = null;
-        let unsubArchive = null;
+        let unsubscribe = null;
+        let debounceTimer = null;
 
+        // AUTH INITIALIZATION
         async function initAuth() {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -177,82 +144,57 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (e) {
-                console.error("Auth failed, retrying...", e);
-                // Simple exponential backoff for GitHub environment issues
-                setTimeout(initAuth, 2000);
+            } catch (err) {
+                console.error("Auth failed:", err);
             }
         }
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                currentUser = user;
-                if (!activeUid) {
-                    activeUid = user.uid;
-                    startSync(activeUid);
-                }
+                document.getElementById('user-badge').innerText = `ID: ${user.uid}`;
+                document.getElementById('display-uid').innerText = user.uid;
+                setupDataListener(user.uid);
             }
         });
 
-        function startSync(uid) {
-            if (unsubData) unsubData();
-            if (unsubArchive) unsubArchive();
-
-            document.getElementById('user-badge').innerText = `SYNC ID: ${uid}`;
-            document.getElementById('display-uid').innerText = uid;
+        function setupDataListener(uid) {
+            if (unsubscribe) unsubscribe();
             
-            // Sync active tasks
-            const docRef = doc(db, 'artifacts', appId, 'users', uid, 'settings', 'daily_plan');
-            unsubData = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    state = docSnap.data();
-                    if (!isViewingArchive) render();
+            // Path following Mandatory Rule 1
+            const docRef = doc(db, 'artifacts', appId, 'users', uid, 'data', 'daily_plan');
+            
+            unsubscribe = onSnapshot(docRef, (snap) => {
+                if (snap.exists()) {
+                    state = snap.data();
+                    render();
                 } else {
-                    // Seed initial state
-                    state = {
-                        big: [{t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []}],
-                        medium: Array(3).fill().map(() => ({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []})),
-                        small: Array(5).fill().map(() => ({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []}))
-                    };
+                    state = getDefaultState();
                     persist();
                 }
-            }, (err) => console.error("Snapshot failed", err));
-
-            // Sync archive
-            const archiveRef = collection(db, 'artifacts', appId, 'users', uid, 'archives');
-            unsubArchive = onSnapshot(archiveRef, (snapshot) => {
-                archivedBatches = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                if (isViewingArchive) renderArchive();
-            }, (err) => console.error("Archive sync failed", err));
+            }, (err) => {
+                console.error("Firestore error:", err);
+                document.getElementById('sync-status').innerText = "• Error";
+            });
         }
 
-        window.loadManualId = () => {
-            const input = document.getElementById('manual-uid-input');
-            const newUid = input.value.trim();
-            if (newUid.length > 5) {
-                activeUid = newUid;
-                startSync(newUid);
-                hideSyncModal();
-                alert("Now syncing with Device ID: " + newUid);
-            }
-        };
+        function getDefaultState() {
+            return {
+                big: [{t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []}],
+                medium: Array(3).fill().map(() => ({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []})),
+                small: Array(5).fill().map(() => ({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []}))
+            };
+        }
 
         async function persist() {
-            if (!activeUid || !state) return;
+            if (!auth.currentUser || !state) return;
             setSyncStatus(true);
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', activeUid, 'settings', 'daily_plan');
+                const docRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'data', 'daily_plan');
                 await setDoc(docRef, state);
-            } catch (e) {
-                console.error("Save error", e);
-            } finally {
-                setTimeout(() => setSyncStatus(false), 500);
+                setSyncStatus(false);
+            } catch (err) {
+                console.error("Persist failed", err);
             }
-        }
-
-        function debouncePersist() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(persist, 800);
         }
 
         function setSyncStatus(syncing) {
@@ -265,111 +207,6 @@
                 el.className = 'synced';
             }
         }
-
-        window.toggleArchiveView = () => {
-            isViewingArchive = !isViewingArchive;
-            const activeView = document.getElementById('active-view');
-            const archiveView = document.getElementById('archive-view');
-            const title = document.getElementById('view-title');
-            const toggleBtn = document.getElementById('archive-toggle-btn');
-            const navBtn = document.getElementById('nav-action-btn');
-            const progress = document.getElementById('progress-container');
-            const perc = document.getElementById('percentage-label');
-
-            if (isViewingArchive) {
-                activeView.classList.add('hidden');
-                archiveView.classList.remove('hidden');
-                title.innerText = "Archive";
-                toggleBtn.innerText = "Back to Focus";
-                navBtn.innerText = "Back";
-                navBtn.onclick = toggleArchiveView;
-                progress.classList.add('hidden');
-                perc.classList.add('hidden');
-                renderArchive();
-            } else {
-                activeView.classList.remove('hidden');
-                archiveView.classList.add('hidden');
-                title.innerText = "Focus";
-                toggleBtn.innerText = "View Archive";
-                navBtn.innerText = "Archive";
-                navBtn.onclick = archiveCompleted;
-                progress.classList.remove('hidden');
-                perc.classList.remove('hidden');
-                render();
-            }
-        };
-
-        function renderArchive() {
-            const list = document.getElementById('archive-list');
-            const empty = document.getElementById('archive-empty-state');
-            list.innerHTML = '';
-            
-            const sortedBatches = [...archivedBatches].sort((a, b) => 
-                new Date(b.archivedAt) - new Date(a.archivedAt)
-            );
-
-            if (sortedBatches.length === 0) {
-                empty.classList.remove('hidden');
-            } else {
-                empty.classList.add('hidden');
-                sortedBatches.forEach(batch => {
-                    const date = new Date(batch.archivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                    
-                    const batchEl = document.createElement('div');
-                    batchEl.className = "space-y-2 border-l-2 border-slate-200 pl-4";
-                    batchEl.innerHTML = `
-                        <div class="flex justify-between items-center mb-4">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${date}</span>
-                            <button onclick="deleteBatch('${batch.id}')" class="text-[9px] font-black text-rose-500 uppercase bg-rose-50 px-2 py-1 rounded">Delete</button>
-                        </div>
-                    `;
-
-                    batch.tasks.forEach(task => {
-                        const item = document.createElement('div');
-                        item.className = `p-4 rounded-2xl border shadow-sm flex justify-between items-center card-${task.color || 'white'}`;
-                        item.innerHTML = `
-                            <div>
-                                <div class="font-bold text-slate-800 text-sm">${task.t || 'Untitled Task'}</div>
-                                <div class="flex gap-1 mt-1">
-                                    ${(task.tags || []).map(t => `<span class="tag-pill text-[8px]">${t}</span>`).join('')}
-                                </div>
-                            </div>
-                            <button onclick="restoreTask('${batch.id}', '${task.id}')" class="bg-indigo-600 text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl">Restore</button>
-                        `;
-                        batchEl.appendChild(item);
-                    });
-                    list.appendChild(batchEl);
-                });
-            }
-        }
-
-        window.deleteBatch = async (batchId) => {
-            if (!confirm("Permanently delete this batch?")) return;
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', activeUid, 'archives', batchId));
-            } catch (e) { console.error(e); }
-        };
-
-        window.restoreTask = async (batchId, taskId) => {
-            const batch = archivedBatches.find(b => b.id === batchId);
-            if (!batch) return;
-            const task = batch.tasks.find(t => t.id.toString() === taskId.toString());
-            if (!task) return;
-
-            task.d = false;
-            state.small.unshift(task);
-            const updatedTasks = batch.tasks.filter(t => t.id.toString() !== taskId.toString());
-            
-            try {
-                if (updatedTasks.length === 0) {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', activeUid, 'archives', batchId));
-                } else {
-                    await setDoc(doc(db, 'artifacts', appId, 'users', activeUid, 'archives', batchId), { ...batch, tasks: updatedTasks });
-                }
-                await persist();
-                alert("Restored to active list!");
-            } catch (e) { console.error(e); }
-        };
 
         function render() {
             if (!state) return;
@@ -385,11 +222,19 @@
                     
                     const subsHtml = (task.subs || []).map((sub, si) => `
                         <div class="subtask-item group/sub">
-                            <input type="checkbox" class="w-4 h-4 rounded" ${sub.d ? 'checked' : ''} id="subcheck-${key}-${i}-${si}">
-                            <input type="text" value="${sub.t}" placeholder="Break it down..." 
+                            <input type="checkbox" class="subtask-check" ${sub.d ? 'checked' : ''} id="subcheck-${key}-${i}-${si}">
+                            <input type="text" value="${sub.t}" placeholder="Add detail..." 
                                 id="subtext-${key}-${i}-${si}"
                                 class="flex-1 bg-transparent border-none focus:outline-none text-xs font-semibold ${sub.d ? 'strikethrough' : 'text-slate-600'}">
+                            <button class="opacity-0 group-hover/sub:opacity-100 text-xs text-red-400" id="subdel-${key}-${i}-${si}">✕</button>
                         </div>
+                    `).join('');
+
+                    const tagsHtml = (task.tags || []).map((tag, ti) => `
+                        <span class="tag-pill shadow-sm">
+                            ${tag}
+                            <button id="tagdel-${key}-${i}-${ti}" class="ml-1 opacity-40 hover:opacity-100">✕</button>
+                        </span>
                     `).join('');
 
                     card.innerHTML = `
@@ -397,27 +242,35 @@
                             <input type="checkbox" ${task.d ? 'checked' : ''} id="check-${key}-${i}">
                             <div class="flex-1">
                                 <textarea id="text-${key}-${i}" 
-                                    placeholder="Task text..." 
+                                    placeholder="Empty task..." 
                                     class="w-full bg-transparent border-none focus:outline-none resize-none font-bold ${key === 'big' ? 'extreme-text' : 'text-base'} ${task.d ? 'strikethrough' : ''}">${task.t}</textarea>
+                                
                                 <div id="subs-container-${key}-${i}">${subsHtml}</div>
-                                <button class="mt-4 text-[9px] font-black uppercase tracking-widest text-indigo-600/40 hover:text-indigo-600" id="addsub-${key}-${i}">+ Subtask</button>
+                                <button class="mt-4 text-[10px] font-black uppercase text-indigo-600/60 hover:text-indigo-600" id="addsub-${key}-${i}">+ Subtask</button>
                             </div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-black/5 flex justify-between items-center">
-                            <div class="flex gap-1">
-                                ${COLORS.map(c => `<div class="color-dot" data-color="${c.id}" style="background-color: ${c.hex}; ${task.color === c.id ? 'border: 2px solid #6366f1' : ''}"></div>`).join('')}
+
+                        <div class="mt-6 pt-4 border-t border-black/5">
+                            <div class="flex flex-wrap gap-2 items-center mb-4">
+                                ${tagsHtml}
+                                <input type="text" placeholder="+ Tag" id="taginput-${key}-${i}" 
+                                    class="bg-transparent text-[10px] font-black uppercase w-14 focus:outline-none text-slate-400">
                             </div>
-                            <input type="text" placeholder="+ Tag" id="taginput-${key}-${i}" class="bg-transparent text-[9px] font-black uppercase w-12 focus:outline-none">
+                            <div class="flex gap-2">
+                                ${COLORS.map(c => `<div class="color-dot colordot-${key}-${i}" data-color="${c.id}" style="background-color: ${c.hex}; ${task.color === c.id ? 'border: 2px solid #6366f1' : ''}"></div>`).join('')}
+                            </div>
                         </div>
                     `;
                     container.appendChild(card);
 
+                    // --- Handlers ---
                     card.querySelector(`#check-${key}-${i}`).onchange = (e) => { task.d = e.target.checked; persist(); };
                     card.querySelector(`#text-${key}-${i}`).oninput = (e) => { 
                         task.t = e.target.value; 
                         e.target.style.height = 'auto';
                         e.target.style.height = e.target.scrollHeight + 'px';
-                        debouncePersist(); 
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(persist, 1000);
                     };
                     card.querySelector(`#addsub-${key}-${i}`).onclick = () => {
                         if (!task.subs) task.subs = [];
@@ -431,63 +284,51 @@
                             persist();
                         }
                     };
+
                     (task.subs || []).forEach((sub, si) => {
                         card.querySelector(`#subcheck-${key}-${i}-${si}`).onchange = (e) => { sub.d = e.target.checked; persist(); };
-                        card.querySelector(`#subtext-${key}-${i}-${si}`).oninput = (e) => { sub.t = e.target.value; debouncePersist(); };
+                        card.querySelector(`#subtext-${key}-${i}-${si}`).oninput = (e) => { sub.t = e.target.value; clearTimeout(debounceTimer); debounceTimer = setTimeout(persist, 1000); };
+                        card.querySelector(`#subdel-${key}-${i}-${si}`).onclick = () => { task.subs.splice(si, 1); persist(); };
                     });
-                    card.querySelectorAll('.color-dot').forEach(dot => {
+
+                    (task.tags || []).forEach((_, ti) => {
+                        card.querySelector(`#tagdel-${key}-${i}-${ti}`).onclick = () => { task.tags.splice(ti, 1); persist(); };
+                    });
+
+                    card.querySelectorAll(`.colordot-${key}-${i}`).forEach(dot => {
                         dot.onclick = () => { task.color = dot.dataset.color; persist(); };
                     });
                     
-                    const textarea = card.querySelector('textarea');
-                    textarea.style.height = textarea.scrollHeight + 'px';
+                    const ta = card.querySelector('textarea');
+                    ta.style.height = 'auto';
+                    ta.style.height = ta.scrollHeight + 'px';
                 });
             });
             updateProgress();
         }
 
         function updateProgress() {
-            const allItems = [...state.big, ...state.medium, ...state.small].filter(t => t.t.trim());
-            let total = 0, done = 0;
-            allItems.forEach(task => {
-                total++; if (task.d) done++;
+            const all = [...state.big, ...state.medium, ...state.small].filter(t => t.t.trim());
+            let tot = 0, done = 0;
+            all.forEach(task => {
+                tot++; if (task.d) done++;
+                (task.subs || []).forEach(s => { tot += 0.5; if (s.d) done += 0.5; });
             });
-            const p = total ? Math.round((done / total) * 100) : 0;
+            const p = tot ? Math.round((done / tot) * 100) : 0;
             document.getElementById('percentage-label').innerText = p + '%';
             document.getElementById('progress-bar').style.width = p + '%';
         }
 
-        window.archiveCompleted = async () => {
-            if (!activeUid || !state) return;
-            const completed = [];
-            const ts = new Date().toISOString();
-            
-            ['big', 'medium', 'small'].forEach(key => {
-                state[key] = state[key].filter(task => {
-                    if (task.t.trim() && task.d) {
-                        completed.push({ ...task, archivedAt: ts });
-                        return false;
-                    }
-                    return true;
-                });
-                // Maintain list minimums
-                if (key === 'big' && state.big.length === 0) state.big.push({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []});
-                if (key === 'medium') while (state.medium.length < 3) state.medium.push({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []});
-                if (key === 'small') while (state.small.length < 5) state.small.push({t: '', d: false, id: Math.random(), color: 'white', subs: [], tags: []});
-            });
-
-            if (completed.length === 0) return alert("No completed tasks to archive.");
-
-            try {
-                setSyncStatus(true);
-                await addDoc(collection(db, 'artifacts', appId, 'users', activeUid, 'archives'), { tasks: completed, archivedAt: ts });
+        // --- Modals & Global Btns ---
+        document.getElementById('btn-reset').onclick = async () => {
+            if(confirm("Clear all tasks?")) {
+                state = getDefaultState();
                 await persist();
-            } catch (e) { console.error(e); }
+            }
         };
-
-        window.showSyncModal = () => document.getElementById('sync-modal').classList.remove('hidden');
-        window.hideSyncModal = () => document.getElementById('sync-modal').classList.add('hidden');
-        window.copyId = () => {
+        document.getElementById('btn-sync').onclick = () => document.getElementById('sync-modal').classList.remove('hidden');
+        document.getElementById('btn-close-modal').onclick = () => document.getElementById('sync-modal').classList.add('hidden');
+        document.getElementById('btn-copy').onclick = () => {
             const id = document.getElementById('display-uid').innerText;
             const el = document.createElement('textarea');
             el.value = id; document.body.appendChild(el); el.select();
